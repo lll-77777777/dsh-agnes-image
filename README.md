@@ -35,10 +35,14 @@ DSH 插件：画图。默认用 [Agnes AI](https://platform.agnes-ai.cn/settings
 - `aspectRatio`：默认 `16:9`，竖屏用 `9:16`
 - `firstFrame` / `lastFrame`：首尾帧图片的**公网 URL**
 - `images`：参考图公网 URL 列表（最多 8 张）
-- `seed`、`model`（`agnes-video-2.5` 默认 / `agnes-video-2.5-flash` 更快）
+- `seed`、`model`（`agnes-video-2.5` 默认；`agnes-video-2.5-flash` 更快，720P 限时免费）
 
 **计费**（人民币刊例价）：720P ¥0.15/秒，1080P 和 1K ¥0.25/秒，2K ¥0.35/秒。
 默认 5 秒 720P ≈ ¥0.75。输入视频的秒数也会算进计费时长。
+
+⭐ **`agnes-video-2.5-flash` 当前 720P 限时免费**：输出秒数、输入秒数、参考图都按 ¥0 计
+（免费政策以 Agnes 平台公告为准）。flash 只支持 720P，最多 5 张参考图 + 3 段参考音频。
+想省钱或先看效果，就用 `model: "agnes-video-2.5-flash"` + `size: "720P"`。
 
 **素材限制**：首尾帧、参考图/音频/视频必须是公网 http(s) 地址 —— Agnes 服务端自己去下载，
 本地文件路径和 data URI 都读不到，填了会直接报错提示。纯 `text` 模式不需要任何图片。

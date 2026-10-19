@@ -488,7 +488,8 @@ function wire(ctx, defineTool, notes) {
         name: 'agnes_video',
         description:
           '生成视频（Agnes Video 2.5）。异步任务：提交后要等几十秒到几分钟，出来会存成本地 mp4 并把文件回显给你。' +
-          '按秒计费（720P ¥0.15/秒、1080P 和 1K ¥0.25/秒、2K ¥0.35/秒），默认 5 秒 720P 约 ¥0.75。' +
+          '按秒计费（720P ¥0.15/秒、1080P 和 1K ¥0.25/秒、2K ¥0.35/秒）。' +
+          '⭐ 省钱提示：agnes-video-2.5-flash 当前 720P 限时免费（输出、输入、参考图都按 ¥0 计），测试或只想先看看效果就用它。' +
           '适合要"生成一段视频""让这张图动起来"（首尾帧）这类需求。参考图必须是公网 http(s) 链接，本地路径不行。',
         parameters: {
           prompt: {
@@ -519,7 +520,7 @@ function wire(ctx, defineTool, notes) {
           model: {
             type: 'string',
             enum: VIDEO_MODELS,
-            description: `模型：默认 ${DEFAULT_VIDEO_MODEL}（质量最高），2.5-flash 更快。`,
+            description: `模型：默认 ${DEFAULT_VIDEO_MODEL}（质量最高），2.5-flash 更快、720P 限时免费（省钱/测试优先用它；flash 只支持 720P）。`,
           },
         },
         output: {
@@ -538,6 +539,7 @@ function wire(ctx, defineTool, notes) {
               aspectRatio: { type: 'string', required: true },
               elapsedMs: { type: 'integer', required: true },
               costCny: { type: 'number', required: true },
+              free: { type: 'boolean' },
               attachmentId: { type: 'string' },
             },
           },
@@ -547,7 +549,8 @@ function wire(ctx, defineTool, notes) {
                 type: 'text',
                 text:
                   `视频好了：${value.path}（${value.seconds} 秒，${value.size}，` +
-                  `${(value.bytes / 1024 / 1024).toFixed(1)} MB，约 ¥${value.costCny.toFixed(2)}，` +
+                  `${(value.bytes / 1024 / 1024).toFixed(1)} MB，` +
+                  `约 ¥${value.costCny.toFixed(2)}${value.free ? '（Flash 720P 限时免费）' : ''}，` +
                   `花了 ${Math.round(value.elapsedMs / 1000)} 秒生成）`,
               },
             ]
@@ -633,6 +636,7 @@ function wire(ctx, defineTool, notes) {
             aspectRatio: result.aspectRatio,
             elapsedMs: result.elapsedMs,
             costCny: result.costCny,
+            free: result.free,
             attachmentId,
           }
         },
