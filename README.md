@@ -19,6 +19,58 @@ DSH 插件：画图。默认用 [Agnes AI](https://platform.agnes-ai.cn/settings
   - 2.0-flash 已于 2026-10 下架，调用会报 503「无可用渠道」；可用清单随时用 `GET /v1/models` 核对
 - `images` 参考图列表，本地绝对路径或 http(s) 地址
 
+## 安装
+
+前提：已经装好 DeepSeek Harness（DSH），并且用的是 `desktop` profile。
+
+**1. 放代码**
+
+把本仓库放到任意目录，下面以 `D:\plugins\dsh-agnes-image` 为例。
+
+**2. 在 profile 里登记依赖**
+
+编辑 `%USERPROFILE%\.dsh\profiles\desktop\package.json`：
+
+```json
+{
+  "dependencies": {
+    "dsh-agnes-image": "link:D:/plugins/dsh-agnes-image"
+  }
+}
+```
+
+**3. 建 junction，让 node_modules 能解析到它**
+
+Windows 用管理员 PowerShell 跑（`link:` 依赖需要真实目录在 node_modules 里）：
+
+```powershell
+New-Item -ItemType Junction `
+  -Path "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\dsh-agnes-image" `
+  -Target "D:\plugins\dsh-agnes-image"
+```
+
+**4. 加进 bundles 列表**
+
+还是那个 `package.json`，在 `dsh.profile.bundles` 末尾加上插件名：
+
+```json
+{
+  "dsh": {
+    "profile": {
+      "bundles": ["其他插件…", "dsh-agnes-image"]
+    }
+  }
+}
+```
+
+**5. 重启 DSH**
+
+重启后浏览器打开 `http://127.0.0.1:<端口>/api/agnes-image/config`，能返回 JSON 就说明加载成功
+（端口每次启动都不同，看启动日志或环境变量 `DSH_WEB_URL`）。然后去 **设置 → Agnes 生图** 填 Key。
+
+**不想用 link 的话**：整个目录复制到 `%USERPROFILE%\.dsh\profiles\desktop\node_modules\dsh-agnes-image`，
+再照第 4 步加 bundles、重启即可（改代码后要重新复制）。
+
 ## 配置
 
 打开 **设置 → Agnes 生图**：
