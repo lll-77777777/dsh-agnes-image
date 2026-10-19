@@ -10,6 +10,8 @@ DSH 插件：画图。默认用 [Agnes AI](https://platform.agnes-ai.cn/settings
 | 文生图 | 「用 Agnes 画一只戴草帽的小鲸鱼」 |
 | 图生图 / 改图 | 「照这张图再画一张，换成夜景」+ 图片路径 |
 | 多图合成 | 「把这两张图合成一张，风格统一」 |
+| 文生视频 | 「生成一段视频：雨夜霓虹街道，跑车缓慢驶过」 |
+| 让图动起来 | 「用这张图当首帧，生成 5 秒视频」+ 公网图片链接 |
 
 工具名 `agnes_image`，参数：
 
@@ -18,6 +20,30 @@ DSH 插件：画图。默认用 [Agnes AI](https://platform.agnes-ai.cn/settings
 - `model`：`agnes-image-2.1-flash`（默认，更快）/ `2.5-flash`（质量最高）
   - 2.0-flash 已于 2026-10 下架，调用会报 503「无可用渠道」；可用清单随时用 `GET /v1/models` 核对
 - `images` 参考图列表，本地绝对路径或 http(s) 地址
+
+## 视频（agnes_video）
+
+第二个工具，走 [Agnes Video 2.5](https://agnes-ai.cn/zh-Hans/docs/agnes-video-25)。它是**异步任务**：
+提交后要轮询几十秒到几分钟，完成后把 mp4 存到本地（`存图目录\videos\`），并在对话里回显成文件。
+
+参数：
+
+- `prompt`（必填）
+- `mode`：`text`（默认，纯文生）/ `keyframe`（首尾帧）/ `reference`（参考图/音频/视频）；不填会按有没有给 `firstFrame` / `images` 自动推断
+- `seconds` 4–12 的整数秒，默认 `5`
+- `size`：`720P`（默认）/ `1080P` / `1K` / `2K`
+- `aspectRatio`：默认 `16:9`，竖屏用 `9:16`
+- `firstFrame` / `lastFrame`：首尾帧图片的**公网 URL**
+- `images`：参考图公网 URL 列表（最多 8 张）
+- `seed`、`model`（`agnes-video-2.5` 默认 / `agnes-video-2.5-flash` 更快）
+
+**计费**（人民币刊例价）：720P ¥0.15/秒，1080P 和 1K ¥0.25/秒，2K ¥0.35/秒。
+默认 5 秒 720P ≈ ¥0.75。输入视频的秒数也会算进计费时长。
+
+**素材限制**：首尾帧、参考图/音频/视频必须是公网 http(s) 地址 —— Agnes 服务端自己去下载，
+本地文件路径和 data URI 都读不到，填了会直接报错提示。纯 `text` 模式不需要任何图片。
+
+**只在「Agnes 官方」接口下可用**：切到自定义 OpenAI 兼容接口时，`agnes_video` 会明确拒绝。
 
 ## 安装
 
@@ -98,9 +124,10 @@ Key 存在 `~/.dsh/agnes-image/config.json`，只在本机；也可以用环境�
 
 ## 实现
 
-- `index.js` —— 宿主半端：`agnes_image` 工具 + `/api/agnes-image/*` 设置接口
+- `index.js` —— 宿主半端：`agnes_image` / `agnes_video` 工具 + `/api/agnes-image/*` 设置接口
 - `client.js` —— 浏览器半端：设置页（`settings.section`）
-- `lib/agnes.mjs` —— API 封装（`POST https://api.agnes-ai.cn/v1/images/generations`）
+- `lib/agnes.mjs` —— 生图 API 封装（`POST https://api.agnes-ai.cn/v1/images/generations`）
+- `lib/video.mjs` —— 视频 API 封装（`POST /v1/videos` 建任务 + `GET /agnesapi` 轮询 + 下载）
 - `lib/hostdeps.mjs` —— 从宿主树取 `defineTool`；拿不到就用等价实现兜底
 - `test/local-check.mjs` —— 不进 DSH 的本地自检：`node test/local-check.mjs`
 

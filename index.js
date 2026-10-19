@@ -21,6 +21,16 @@ import {
   normalizeEndpoint,
   sniffImageMediaType,
 } from './lib/agnes.mjs'
+import {
+  DEFAULT_VIDEO_ASPECT_RATIO,
+  DEFAULT_VIDEO_MODEL,
+  DEFAULT_VIDEO_SIZE,
+  VIDEO_ASPECT_RATIOS,
+  VIDEO_MODELS,
+  VIDEO_MODES,
+  VIDEO_SIZES,
+  generateVideo,
+} from './lib/video.mjs'
 
 export const name = 'dsh-agnes-image'
 export const inject = ['tools', 'webServer']
@@ -468,6 +478,162 @@ function wire(ctx, defineTool, notes) {
             revisedPrompt: result.revisedPrompt ?? null,
             model: result.model,
             size: result.size,
+          }
+        },
+      }),
+    )
+
+    actx.tools.register(
+      defineTool({
+        name: 'agnes_video',
+        description:
+          '生成视频（Agnes Video 2.5）。异步任务：提交后要等几十秒到几分钟，出来会存成本地 mp4 并把文件回显给你。' +
+          '按秒计费（720P ¥0.15/秒、1080P 和 1K ¥0.25/秒、2K ¥0.35/秒），默认 5 秒 720P 约 ¥0.75。' +
+          '适合要"生成一段视频""让这张图动起来"（首尾帧）这类需求。参考图必须是公网 http(s) 链接，本地路径不行。',
+        parameters: {
+          prompt: {
+            type: 'string',
+            required: true,
+            description: '视频内容描述：主体、动作、镜头语言、光线、声音都可以写进去。',
+          },
+          mode: {
+            type: 'string',
+            enum: VIDEO_MODES,
+            description: '生成模式：text 纯文生视频（默认）；keyframe 首尾帧控制；reference 用参考图/音频/视频。不填会按给没给 firstFrame/images 自动推断。',
+          },
+          seconds: { type: 'string', description: '时长，4–12 的整数秒，默认 "5"。' },
+          size: { type: 'string', enum: VIDEO_SIZES, description: '分辨率档位，默认 720P（最便宜）。' },
+          aspectRatio: {
+            type: 'string',
+            enum: VIDEO_ASPECT_RATIOS,
+            description: '画幅比例，默认 16:9；竖屏短视频用 9:16。',
+          },
+          firstFrame: { type: 'string', description: '首帧图片公网 URL（keyframe 模式，与 lastFrame 至少给一个）' },
+          lastFrame: { type: 'string', description: '尾帧图片公网 URL（keyframe 模式）' },
+          images: {
+            type: 'array',
+            items: { type: 'string' },
+            description: '参考图公网 URL 列表（reference 模式，最多 8 张）',
+          },
+          seed: { type: 'integer', description: '随机种子，同样的种子更容易复现同一条片子。' },
+          model: {
+            type: 'string',
+            enum: VIDEO_MODELS,
+            description: `模型：默认 ${DEFAULT_VIDEO_MODEL}（质量最高），2.5-flash 更快。`,
+          },
+        },
+        output: {
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              path: { type: 'string', required: true, description: '本地保存路径' },
+              fileName: { type: 'string', required: true },
+              mediaType: { type: 'string', required: true },
+              bytes: { type: 'integer', required: true },
+              videoId: { type: 'string', required: true },
+              model: { type: 'string', required: true },
+              seconds: { type: 'string', required: true },
+              size: { type: 'string', required: true },
+              aspectRatio: { type: 'string', required: true },
+              elapsedMs: { type: 'integer', required: true },
+              costCny: { type: 'number', required: true },
+              attachmentId: { type: 'string' },
+            },
+          },
+          render: (_args, value) => {
+            const blocks = [
+              {
+                type: 'text',
+                text:
+                  `视频好了：${value.path}（${value.seconds} 秒，${value.size}，` +
+                  `${(value.bytes / 1024 / 1024).toFixed(1)} MB，约 ¥${value.costCny.toFixed(2)}，` +
+                  `花了 ${Math.round(value.elapsedMs / 1000)} 秒生成）`,
+              },
+            ]
+            if (value.attachmentId) {
+              blocks.push({
+                type: 'file',
+                attachment: {
+                  attachmentId: value.attachmentId,
+                  name: value.fileName,
+                  mediaType: value.mediaType,
+                  bytes: value.bytes,
+                },
+              })
+            }
+            return blocks
+          },
+          presentationMeta: (_args, value) => ({ path: value.path }),
+        },
+        async execute(args) {
+          const cfg = await readConfig()
+          const apiKey = await effectiveApiKey(cfg)
+          if (!apiKey) {
+            throw new Error('还没填 Agnes AI 的 API Key —— 打开「设置 → Agnes 生图」填一下，或设环境变量 AGNES_API_KEY')
+          }
+          if (effectiveProvider(cfg) === 'compat') {
+            throw new Error(
+              '视频只在「Agnes 官方」接口下能用 —— 去「设置 → Agnes 生图」把接口来源切回官方（自定义接口只支持生图）',
+            )
+          }
+
+          const mode = VIDEO_MODES.includes(args.mode)
+            ? args.mode
+            : (args.firstFrame || args.lastFrame
+              ? 'keyframe'
+              : (Array.isArray(args.images) && args.images.length ? 'reference' : 'text'))
+
+          const result = await generateVideo({
+            apiKey,
+            model: VIDEO_MODELS.includes(args.model) ? args.model : DEFAULT_VIDEO_MODEL,
+            prompt: args.prompt,
+            mode,
+            seconds: args.seconds,
+            size: VIDEO_SIZES.includes(args.size) ? args.size : DEFAULT_VIDEO_SIZE,
+            aspectRatio: VIDEO_ASPECT_RATIOS.includes(args.aspectRatio)
+              ? args.aspectRatio
+              : DEFAULT_VIDEO_ASPECT_RATIO,
+            seed: args.seed,
+            firstFrame: args.firstFrame,
+            lastFrame: args.lastFrame,
+            images: args.images,
+          })
+
+          const dir = join(resolveOutDir(cfg), 'videos')
+          try {
+            await mkdir(dir, { recursive: true })
+          } catch (error) {
+            throw new Error(`视频目录建不出来：${dir}（${error?.code || error?.message || error}）`)
+          }
+          const fileName = `agnes-video-${stamp()}-${randomBytes(3).toString('hex')}.mp4`
+          const filePath = join(dir, fileName)
+          try {
+            await writeFile(filePath, result.bytes)
+          } catch (error) {
+            throw new Error(`视频存不进 ${dir}（${error?.code || error?.message || error}）`)
+          }
+
+          // 能存进附件就顺手回显一条文件卡片；宿主不支持就只给路径，不影响已存好的文件
+          let attachmentId = ''
+          try {
+            const saved = await attachments.saveFile({ data: result.bytes, name: fileName })
+            attachmentId = saved?.attachmentId || ''
+          } catch { /* 忽略：附件回显是加分项 */ }
+
+          return {
+            path: filePath,
+            fileName,
+            mediaType: result.mediaType,
+            bytes: result.bytes.length,
+            videoId: result.videoId,
+            model: result.model,
+            seconds: result.seconds,
+            size: result.size,
+            aspectRatio: result.aspectRatio,
+            elapsedMs: result.elapsedMs,
+            costCny: result.costCny,
+            attachmentId,
           }
         },
       }),

@@ -369,6 +369,20 @@ window.__ModuleLoader__.load({
               '默认是 ', h('code', null, state.defaultOutDir || '~/.dsh/agnes-image/out'),
               '。填绝对路径（也可以写 ~ 开头），目录不存在会自动建。每张图除了存盘，也会直接显示在对话里。'))),
 
+        h('div', { 'data-ai-sec': '' },
+          h('div', { 'data-ai-h': '' }, '视频（agnes_video）'),
+          h('div', { 'data-ai-card': '' },
+            h('div', { 'data-ai-note': '' },
+              '在对话里说「生成一段视频……」就会调 agnes_video。和生图共用同一个 Key；视频单独存在 ',
+              h('code', null, (state.outDir || '') + '\\videos'),
+              ' 里。'),
+            h('div', { 'data-ai-note': '' },
+              '按秒计费（人民币刊例价）：720P ¥0.15/秒 · 1080P 和 1K ¥0.25/秒 · 2K ¥0.35/秒。默认 5 秒 720P ≈ ¥0.75。'),
+            h('div', { 'data-ai-note': '' },
+              '首尾帧 / 参考图必须是公网 http(s) 链接 —— Agnes 服务端要自己下载，读不到本机文件；纯文生视频不需要图片。'),
+            h('div', { 'data-ai-note': '' },
+              '视频只走「Agnes 官方」接口；接口来源切到自定义时这个工具会拒绝。'))),
+
         msg ? h('div', { 'data-ai-msg': '', 'data-err': msgErr ? '' : undefined }, msg) : null,
       )
     }
